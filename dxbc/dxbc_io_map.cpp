@@ -371,9 +371,28 @@ bool IoMap::emitGsPassthrough(ir::Builder& builder) {
     if (!declareIoSignatureVars(builder, &m_osgn, RegisterType::eOutput,
         e.getRegisterIndex(), 0u, e.getComponentMask(), ir::InterpolationModes()))
       return false;
+  }
 
+  /* Emit each vertex of the incoming primitive. Only the input primitive
+   * type may get changed later, so never exceed the output vertex count. */
+  auto vertexCount = builder.add(ir::Op::UMin(ir::ScalarType::eU32,
+    determineActualVertexCount(builder), builder.makeConstant(m_converter.m_gs.outputVertices)));
+
+  auto counter = builder.add(ir::Op::DclTmp(ir::ScalarType::eU32, m_converter.getEntryPoint()));
+  builder.add(ir::Op::TmpStore(counter, builder.makeConstant(0u)));
+
+  auto loop = builder.add(ir::Op::ScopedLoop(ir::SsaDef()));
+  auto vertexIndex = builder.add(ir::Op::TmpLoad(ir::ScalarType::eU32, counter));
+
+  auto breakCondition = builder.add(ir::Op::UGe(ir::ScalarType::eBool, vertexIndex, vertexCount));
+  auto breakIf = builder.add(ir::Op::ScopedIf(ir::SsaDef(), breakCondition));
+  builder.add(ir::Op::ScopedLoopBreak(loop));
+  auto breakEndIf = builder.add(ir::Op::ScopedEndIf(breakIf));
+  builder.rewriteOp(breakIf, ir::Op(builder.getOp(breakIf)).setOperand(0u, breakEndIf));
+
+  for (const auto& e : m_osgn) {
     auto value = loadIoRegister(builder, e.getScalarType(), RegisterType::eInput,
-      builder.makeConstant(0u), ir::SsaDef(), e.getRegisterIndex(), Swizzle::identity(), e.getComponentMask());
+      vertexIndex, ir::SsaDef(), e.getRegisterIndex(), Swizzle::identity(), e.getComponentMask());
 
     if (!value)
       return false;
@@ -387,6 +406,12 @@ bool IoMap::emitGsPassthrough(ir::Builder& builder) {
 
   /* Commit output vertex */
   builder.add(ir::Op::EmitVertex(0u));
+
+  builder.add(ir::Op::TmpStore(counter, builder.add(
+    ir::Op::IAdd(ir::ScalarType::eU32, vertexIndex, builder.makeConstant(1u)))));
+
+  auto loopEnd = builder.add(ir::Op::ScopedEndLoop(loop));
+  builder.rewriteOp(loop, ir::Op(builder.getOp(loop)).setOperand(0u, loopEnd));
   return true;
 }
 

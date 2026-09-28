@@ -298,6 +298,11 @@ public:
    *  of any relevant input variable to match the new vertex count. */
   bool changeGsInputPrimitiveType(PrimitiveType primitiveType);
 
+  /** Changes input and output primitive of a pass-through geometry shader as
+   *  created by dxbc::Converter::createPassthroughGs, so that it emits each
+   *  incoming primitive unchanged. Fails for primitives with adjacency. */
+  bool changeGsPassthroughPrimitiveType(PrimitiveType primitiveType);
+
   /** Removes outputs not in the given output set. This is primarily intended for
    *  pixel shader outputs. If any outputs are removed, all code contributing to
    *  those outputs will also be removed. */

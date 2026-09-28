@@ -49,10 +49,11 @@ bool Converter::createPassthroughGs(ir::Builder& builder) {
   if (!m_ioMap.init(m_dxbc, ShaderType::eGeometry))
     return false;
 
-  /* Set up GS state, I/O map code is going to read this */
+  /* Set up GS state, I/O map code is going to read this. Declare enough
+   * output vertices to pass through any primitive without adjacency. */
   m_gs.inputPrimitive = PrimitiveType::ePoint;
   m_gs.outputTopology = PrimitiveTopology::ePointList;
-  m_gs.outputVertices = 1u;
+  m_gs.outputVertices = 3u;
   m_gs.streamMask = 0x1u;
 
   if (!m_ioMap.emitGsPassthrough(builder))

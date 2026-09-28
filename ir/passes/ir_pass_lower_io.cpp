@@ -360,6 +360,33 @@ bool LowerIoPass::changeGsInputPrimitiveType(PrimitiveType primitiveType) {
 }
 
 
+bool LowerIoPass::changeGsPassthroughPrimitiveType(PrimitiveType primitiveType) {
+  if (primitiveType != PrimitiveType::ePoints &&
+      primitiveType != PrimitiveType::eLines &&
+      primitiveType != PrimitiveType::eTriangles)
+    return false;
+
+  if (!changeGsInputPrimitiveType(primitiveType))
+    return false;
+
+  /* The shader emits all vertices of the incoming primitive, so emitting
+   * them as a strip of the same primitive type reproduces the primitive. */
+  auto [a, b] = m_builder.getDeclarations();
+
+  for (auto iter = a; iter != b; iter++) {
+    if (iter->getOpCode() == OpCode::eSetGsOutputPrimitive) {
+      auto streamMask = uint32_t(iter->getOperand(iter->getFirstLiteralOperandIndex() + 1u));
+
+      m_builder.rewriteOp(iter->getDef(), Op::SetGsOutputPrimitive(
+        SsaDef(iter->getOperand(0u)), primitiveType, streamMask));
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
 bool LowerIoPass::resolveUnusedOutputs(const IoMap& consumedOutputs) {
   auto iter = m_builder.getDeclarations().first;
   bool progress = false;

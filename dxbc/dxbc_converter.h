@@ -66,7 +66,9 @@ public:
   bool convertShader(ir::Builder& builder);
 
   /** Creates pass-through geometry shader for use with D3D10 or D3D11 stream
-   *  output. Only requires the input blob to have an output signature. */
+   *  output. Only requires the input blob to have an output signature. The
+   *  shader emits each input vertex as a point, unless its primitive type is
+   *  changed with LowerIoPass::changeGsPassthroughPrimitiveType. */
   bool createPassthroughGs(ir::Builder& builder);
 
 private:

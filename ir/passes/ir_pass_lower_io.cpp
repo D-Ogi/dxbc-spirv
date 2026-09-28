@@ -360,6 +360,46 @@ bool LowerIoPass::changeGsInputPrimitiveType(PrimitiveType primitiveType) {
 }
 
 
+bool LowerIoPass::changeGsPassthroughPrimitiveType(PrimitiveType primitiveType) {
+  if (primitiveType != PrimitiveType::ePoints &&
+      primitiveType != PrimitiveType::eLines &&
+      primitiveType != PrimitiveType::eTriangles)
+    return false;
+
+  if (!changeGsInputPrimitiveType(primitiveType))
+    return false;
+
+  /* Emitting the input vertices of a line or triangle as a strip of the same
+   * primitive reproduces it, including its vertex order */
+  SsaDef outputPrimitive = { };
+  SsaDef outputVertices = { };
+
+  auto [a, b] = m_builder.getDeclarations();
+
+  for (auto iter = a; iter != b; iter++) {
+    if (iter->getOpCode() == OpCode::eSetGsOutputPrimitive)
+      outputPrimitive = iter->getDef();
+    else if (iter->getOpCode() == OpCode::eSetGsOutputVertices)
+      outputVertices = iter->getDef();
+  }
+
+  if (!outputPrimitive || !outputVertices)
+    return false;
+
+  const auto& primitiveOp = m_builder.getOp(outputPrimitive);
+  auto streamMask = uint32_t(primitiveOp.getOperand(primitiveOp.getFirstLiteralOperandIndex() + 1u));
+
+  m_builder.rewriteOp(outputPrimitive, Op::SetGsOutputPrimitive(
+    SsaDef(primitiveOp.getOperand(0u)), primitiveType, streamMask));
+
+  const auto& verticesOp = m_builder.getOp(outputVertices);
+
+  m_builder.rewriteOp(outputVertices, Op::SetGsOutputVertices(
+    SsaDef(verticesOp.getOperand(0u)), primitiveVertexCount(primitiveType)));
+  return true;
+}
+
+
 bool LowerIoPass::resolveUnusedOutputs(const IoMap& consumedOutputs) {
   auto iter = m_builder.getDeclarations().first;
   bool progress = false;

@@ -156,7 +156,8 @@ public:
   bool emitHsControlPointPhasePassthrough(ir::Builder& builder);
 
   /** Emits pass-through geometry shader based on the output
-   *  signature of the incoming shader. */
+   *  signature of the incoming shader. The shader emits each
+   *  vertex of its input primitive. */
   bool emitGsPassthrough(ir::Builder& builder);
 
   /** Clamps exported tess factors to the requested range. This must be the last

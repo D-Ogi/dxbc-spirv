@@ -371,9 +371,27 @@ bool IoMap::emitGsPassthrough(ir::Builder& builder) {
     if (!declareIoSignatureVars(builder, &m_osgn, RegisterType::eOutput,
         e.getRegisterIndex(), 0u, e.getComponentMask(), ir::InterpolationModes()))
       return false;
+  }
 
+  /* Emit every vertex of the input primitive, so that stream output sees
+   * complete lines and triangles. The shader takes points until it is linked,
+   * see LowerIoPass::changeGsPassthroughPrimitiveType, so the vertex count is
+   * only known when lowering to SPIR-V. */
+  auto counter = builder.add(ir::Op::DclTmp(ir::ScalarType::eU32, m_converter.getEntryPoint()));
+  builder.add(ir::Op::TmpStore(counter, builder.makeConstant(0u)));
+
+  auto loop = builder.add(ir::Op::ScopedLoop(ir::SsaDef()));
+  auto vertexIndex = builder.add(ir::Op::TmpLoad(ir::ScalarType::eU32, counter));
+
+  auto done = builder.add(ir::Op::UGe(ir::ScalarType::eBool, vertexIndex, determineActualVertexCount(builder)));
+  auto doneBlock = builder.add(ir::Op::ScopedIf(ir::SsaDef(), done));
+  builder.add(ir::Op::ScopedLoopBreak(loop));
+  auto doneEnd = builder.add(ir::Op::ScopedEndIf(doneBlock));
+  builder.rewriteOp(doneBlock, ir::Op(builder.getOp(doneBlock)).setOperand(0u, doneEnd));
+
+  for (const auto& e : m_osgn) {
     auto value = loadIoRegister(builder, e.getScalarType(), RegisterType::eInput,
-      builder.makeConstant(0u), ir::SsaDef(), e.getRegisterIndex(), Swizzle::identity(), e.getComponentMask());
+      vertexIndex, ir::SsaDef(), e.getRegisterIndex(), Swizzle::identity(), e.getComponentMask());
 
     if (!value)
       return false;
@@ -387,6 +405,11 @@ bool IoMap::emitGsPassthrough(ir::Builder& builder) {
 
   /* Commit output vertex */
   builder.add(ir::Op::EmitVertex(0u));
+  builder.add(ir::Op::TmpStore(counter, builder.add(
+    ir::Op::IAdd(ir::ScalarType::eU32, vertexIndex, builder.makeConstant(1u)))));
+
+  auto loopEnd = builder.add(ir::Op::ScopedEndLoop(loop));
+  builder.rewriteOp(loop, ir::Op(builder.getOp(loop)).setOperand(0u, loopEnd));
   return true;
 }
 

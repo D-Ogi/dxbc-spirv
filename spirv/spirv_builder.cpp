@@ -26,6 +26,13 @@ void SpirvBuilder::buildSpirvBinary() {
   if (m_options.maxCbvSize || m_options.maxCbvCount >= 0)
     demoteCbv();
 
+  /* Output declarations of a geometry shader need to know whether it uses
+   * multiple streams, but the stream mask is only set after them. */
+  for (const auto& op : m_builder) {
+    if (op.getOpCode() == ir::OpCode::eSetGsOutputPrimitive)
+      m_geometry.streamMask = uint32_t(op.getOperand(2u));
+  }
+
   for (const auto& op : m_builder)
     emitInstruction(op);
 

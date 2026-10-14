@@ -90,7 +90,10 @@ SsaDef Builder::addAfter(SsaDef ref, Op op) {
 
 
 SsaDef Builder::remove(SsaDef def) {
-  auto op = getOp(def);
+  /* A reference, not a copy: getOp returns one, an Op is 128 bytes with its operands, and nothing below
+   * moves this op. removeUse only touches the use lists of the operands, and the container keeps its
+   * storage in place. Every removed op was copied here before. */
+  const auto& op = getOp(def);
 
   dxbc_spv_assert(op);
 

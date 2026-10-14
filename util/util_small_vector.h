@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <new>
 #include <initializer_list>
@@ -240,13 +241,22 @@ public:
 
   /** Removes an element at a given index. */
   iterator erase(size_t idx) {
-    std::launder(ptr(idx))->~T();
+    if constexpr (std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>) {
+      /* Everything behind the erased element moves one slot forward. For a trivial element type that is one
+       * memmove instead of a move construction and a destructor call per element, which is what the IR
+       * builder's use lists need: they are erased from constantly and the hottest of them hold thousands
+       * of defs, so the shift, not the search, dominates Builder::removeUse. */
+      if (idx + 1u < size())
+        std::memmove(ptr(idx), ptr(idx + 1u), (size() - idx - 1u) * sizeof(T));
+    } else {
+      std::launder(ptr(idx))->~T();
 
-    for (size_t i = idx; i < size() - 1; i++) {
-      auto object = std::launder(ptr(i + 1));
+      for (size_t i = idx; i < size() - 1; i++) {
+        auto object = std::launder(ptr(i + 1));
 
-      new (ptr(i)) T(std::move(*object));
-      object->~T();
+        new (ptr(i)) T(std::move(*object));
+        object->~T();
+      }
     }
 
     m_state.size--;

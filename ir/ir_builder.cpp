@@ -122,7 +122,10 @@ void Builder::rewriteOp(SsaDef def, Op op) {
     auto target = SsaDef(op.getOperand(i));
     dxbc_spv_assert(!target || getOp(target));
 
-    addUse(target, def);
+    /* The loop above removed this def from the use list of every operand of the op being replaced, so
+     * again only an earlier operand of the new op can have registered it. */
+    if (isFirstUseOfTarget(op, i, target))
+      addUse(target, def);
   }
 
   dstOp = op;
@@ -140,12 +143,21 @@ SsaDef Builder::rewriteDef(SsaDef oldDef, SsaDef newDef) {
     for (auto u : oldMetadata.uses) {
       auto& op = m_ops.at(u).op;
 
+      /* A user that already had the new def among its operands is in its use list already; the operands
+       * that are being rewritten are what made it a user of the old def, not of the new one. */
+      bool registered = false;
+
       for (uint32_t i = 0u; i < op.getFirstLiteralOperandIndex(); i++) {
-        if (SsaDef(op.getOperand(i)) == SsaDef(oldDef))
+        auto operand = SsaDef(op.getOperand(i));
+
+        if (operand == SsaDef(oldDef))
           op.setOperand(i, Operand(SsaDef(newDef)));
+        else if (operand == SsaDef(newDef))
+          registered = true;
       }
 
-      addUse(newDef, u);
+      if (!registered)
+        addUse(newDef, u);
     }
   }
 
@@ -223,7 +235,10 @@ std::pair<SsaDef, bool> Builder::writeOp(Op&& op) {
     auto target = SsaDef(dstOp.getOperand(i));
     dxbc_spv_assert(!target || getOp(target));
 
-    addUse(target, def);
+    /* The def was allocated above, so no use list can mention it yet; only an earlier operand of this
+     * same op can have registered it. */
+    if (isFirstUseOfTarget(dstOp, i, target))
+      addUse(target, def);
   }
 
   if (dstOp.isConstant() || dstOp.isUndef())
@@ -237,14 +252,17 @@ void Builder::addUse(SsaDef target, SsaDef user) {
   if (!target)
     return;
 
-  auto& metadata = m_ops.at(target);
+  m_ops.at(target).uses.push_back(user);
+}
 
-  for (auto u : metadata.uses) {
-    if (u == user)
-      return;
+
+bool Builder::isFirstUseOfTarget(const Op& op, uint32_t index, SsaDef target) {
+  for (uint32_t i = 0u; i < index; i++) {
+    if (SsaDef(op.getOperand(i)) == target)
+      return false;
   }
 
-  metadata.uses.push_back(user);
+  return true;
 }
 
 

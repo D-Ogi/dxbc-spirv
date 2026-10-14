@@ -362,7 +362,14 @@ private:
 
   std::pair<SsaDef, bool> writeOp(Op&& op);
 
+  /* Registers a use that the caller has established is not registered yet. Every caller can tell that from
+   * the user's own operands, which is why there is no variant that searches the use list: a def with
+   * thousands of users made that search the most expensive part of building the IR. */
   void addUse(SsaDef target, SsaDef user);
+
+  /* Whether operand \c index of \c op is the first operand of that op referring to \c target. Operands
+   * past the first are duplicates and must not register the use a second time. */
+  static bool isFirstUseOfTarget(const Op& op, uint32_t index, SsaDef target);
 
   void removeUse(SsaDef target, SsaDef user);
 

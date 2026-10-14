@@ -83,14 +83,19 @@ private:
 
   util::small_vector<std::shared_ptr<Array>, 16u> m_layers;
 
+  /* The index is masked into the layer, so it can never be out of range, and the layer is checked by
+   * assertion rather than by std::array::at: every IR walk goes through this accessor (7.2 billion times
+   * over the War Thunder shader set), and the throwing accessor also kept it from inlining. */
   const T& get(SsaDef def) const {
     auto [index, layer] = computeAddress(def);
-    return m_layers.at(layer)->at(index);
+    dxbc_spv_assert(layer < m_layers.size());
+    return (*m_layers[layer])[index];
   }
 
   T& get(SsaDef def) {
     auto [index, layer] = computeAddress(def);
-    return m_layers.at(layer)->at(index);
+    dxbc_spv_assert(layer < m_layers.size());
+    return (*m_layers[layer])[index];
   }
 
   static std::pair<size_t, size_t> computeAddress(SsaDef def) {

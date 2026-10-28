@@ -1,3 +1,7 @@
+> **amdgpu-wddm fork.** This branch, `amdgpu-wddm/main`, is the dxbc-spirv source of the DXBC to SPIR-V converter of the Direct3D 11 engine (the submodule of dxvk acb78320) in the amdgpu-wddm tester release 0.7.216.105-tester.33: commit [`28fda04a`](https://github.com/D-Ogi/dxbc-spirv/commit/28fda04a8a1ce00b1d2edbbfe5ccc5dec2b7c07f), plus this note. The driver project is https://github.com/D-Ogi/amdgpu-wddm. The other `amdgpu-wddm/*` branches hold work in progress and older release lines. The upstream project is https://github.com/doitsujin/dxbc-spirv; its README follows unchanged.
+
+---
+
 # dxbc-spirv
 
 An SSA-based compiler for Direct3D Shader Models 5.1 and older.
